@@ -78,6 +78,101 @@
     font-size: 0.68rem; color: var(--muted); letter-spacing: 0.05em;
   }
 
+  /* Sync status */
+  #sync-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sync-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+  .sync-dot.synced { background: #3a7a5a; }
+  .sync-dot.syncing { background: #d4a017; animation: pulse 1.2s ease-in-out infinite; }
+  .sync-dot.error { background: var(--accent); }
+  .sync-dot.local { background: #888; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  /* Share modal specifics */
+  .share-section {
+    background: #fbf8f1;
+    border: 1px solid var(--line-soft);
+    border-radius: 3px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .share-section h4 {
+    margin: 0 0 8px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .share-section p {
+    margin: 0 0 10px 0;
+    font-size: 0.88rem;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .share-link-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .share-link-row input {
+    flex: 1;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    background: white;
+  }
+  .share-step {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+  }
+  .step-num {
+    flex-shrink: 0;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+  .step-body { flex: 1; font-size: 0.88rem; line-height: 1.5; }
+  .step-body a { color: var(--accent); }
+  .step-body code {
+    background: white;
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-size: 0.78rem;
+    border: 1px solid var(--line);
+  }
+  .copy-feedback {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: #3a7a5a;
+    margin-left: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .copy-feedback.show { opacity: 1; }
+  .danger-zone {
+    border-top: 1px solid var(--line-soft);
+    padding-top: 14px;
+    margin-top: 14px;
+  }
+
   .months { display: grid; grid-template-columns: repeat(2, 1fr); gap: 36px; }
   @media (max-width: 900px) { .months { grid-template-columns: 1fr; } }
   .month {
@@ -288,8 +383,11 @@
   </header>
 
   <div class="toolbar">
-    <div class="hint">Click any day to add or edit · Manage categories anytime · Saves to your browser</div>
+    <div class="hint">
+      <span id="sync-status">Click any day to add or edit · Saves to your browser</span>
+    </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="openShareModal()">Share</button>
       <button class="btn" onclick="openCategoryManager()">Categories</button>
       <button class="btn" onclick="exportData()">Export</button>
       <button class="btn" onclick="importData()">Import</button>
@@ -388,8 +486,92 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="share-modal">
+  <div class="modal" style="max-width: 560px;">
+    <h2>Share <em>calendar</em></h2>
+    <div class="modal-date" id="share-status-line">Currently saving locally</div>
+
+    <!-- SETUP VIEW: shown when not yet connected -->
+    <div id="share-setup">
+      <div class="share-section">
+        <h4>One-time setup</h4>
+        <p>To share this calendar so others can edit it, you'll connect it to a free GitHub Gist. Takes about 3 minutes.</p>
+
+        <div class="share-step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            Go to <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noopener">github.com/settings/tokens</a> and create a <strong>Personal Access Token (classic)</strong>. Under "Select scopes," check only <code>gist</code>. Copy the token (starts with <code>ghp_</code>).
+          </div>
+        </div>
+        <div class="share-step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            Paste the token below and click Connect. The calendar will create a private Gist to store events and give you a shareable link.
+          </div>
+        </div>
+        <div class="share-step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            Send the link to anyone you want to collaborate with. They'll need their own token (with <code>gist</code> scope) to edit — sharing yours is not recommended.
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>GitHub Personal Access Token</label>
+        <input type="password" id="gh-token" placeholder="ghp_..." autocomplete="off" spellcheck="false">
+      </div>
+
+      <div class="field" id="join-existing-field" style="display:none;">
+        <label>Joining a shared calendar — Gist ID detected</label>
+        <input type="text" id="gh-gist-id" readonly>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" onclick="closeShareModal()">Cancel</button>
+        <div class="right">
+          <button class="btn btn-primary" id="connect-btn" onclick="connectAndShare()">Connect & Create Link</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONNECTED VIEW: shown when sharing is active -->
+    <div id="share-connected" style="display:none;">
+      <div class="share-section">
+        <h4>Shareable link</h4>
+        <p>Anyone with this link plus their own GitHub token (with <code>gist</code> scope) can view and edit. Changes sync every few seconds.</p>
+        <div class="share-link-row">
+          <input type="text" id="share-link" readonly>
+          <button class="btn btn-primary" onclick="copyShareLink()">Copy</button>
+        </div>
+        <span class="copy-feedback" id="copy-feedback">Copied to clipboard</span>
+      </div>
+
+      <div class="share-section">
+        <h4>Sync status</h4>
+        <p id="share-detail" style="margin:0 0 8px 0;">Connected. Changes save to the cloud automatically.</p>
+        <p style="margin:0; font-size:0.8rem;">
+          <a id="gist-link" href="#" target="_blank" rel="noopener" style="color:var(--accent);">View Gist on GitHub →</a>
+        </p>
+      </div>
+
+      <div class="danger-zone">
+        <p style="font-size:0.85rem; color:var(--muted); margin:0 0 10px 0;">
+          Disconnecting stops syncing. Your local copy stays intact, the Gist remains on GitHub, but this device won't push changes anymore.
+        </p>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <button class="btn btn-danger" onclick="disconnectShare()">Stop sharing</button>
+          <button class="btn" onclick="closeShareModal()">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <script>
   const STORAGE_KEY = 'summer2026-calendar-v2';
+  const SHARE_KEY = 'summer2026-share-config-v1';
   const MONTHS = [
     { name: 'May',    index: 4, year: 2026 },
     { name: 'June',   index: 5, year: 2026 },
@@ -441,6 +623,7 @@
   function saveState() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
     catch (e) { console.warn('Could not save:', e); }
+    schedulePush();
   }
 
   function uid(prefix) { return (prefix || 'id') + '-' + Math.random().toString(36).slice(2, 10); }
@@ -969,7 +1152,8 @@
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-      if (document.getElementById('cat-edit-modal').classList.contains('open')) closeCategoryEditor();
+      if (document.getElementById('share-modal').classList.contains('open')) closeShareModal();
+      else if (document.getElementById('cat-edit-modal').classList.contains('open')) closeCategoryEditor();
       else if (document.getElementById('cat-modal').classList.contains('open')) closeCategoryManager();
       else closeModal();
     }
@@ -978,14 +1162,385 @@
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
     overlay.addEventListener('click', e => {
       if (e.target === overlay) {
-        if (overlay.id === 'cat-edit-modal') closeCategoryEditor();
+        if (overlay.id === 'share-modal') closeShareModal();
+        else if (overlay.id === 'cat-edit-modal') closeCategoryEditor();
         else if (overlay.id === 'cat-modal') closeCategoryManager();
         else closeModal();
       }
     });
   });
 
+  // ============================================================
+  // SHARE / SYNC SYSTEM (GitHub Gist)
+  // ============================================================
+
+  const GH_API = 'https://api.github.com';
+  const GIST_FILENAME = 'calendar-data.json';
+  const POLL_MS = 5000;
+  const PUSH_DEBOUNCE_MS = 800;
+
+  let shareConfig = loadShareConfig();   // { gistId, token }
+  let pushTimer = null;
+  let pollTimer = null;
+  let lastEtag = null;       // for conditional GETs (saves rate limit)
+  let lastVersion = 0;       // bumped on every successful push, sent inside payload
+  let suppressPush = false;
+  let syncState = 'local';
+
+  function loadShareConfig() {
+    try {
+      const raw = localStorage.getItem(SHARE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return null;
+  }
+
+  function saveShareConfig(cfg) {
+    if (cfg) localStorage.setItem(SHARE_KEY, JSON.stringify(cfg));
+    else localStorage.removeItem(SHARE_KEY);
+    shareConfig = cfg;
+  }
+
+  function setSyncStatus(status, detail) {
+    syncState = status;
+    const el = document.getElementById('sync-status');
+    if (!el) return;
+    const labels = {
+      local:   'Saving locally · click Share to collaborate',
+      syncing: 'Syncing with GitHub…',
+      synced:  'Synced · ' + (detail || 'all changes saved'),
+      error:   'Sync error · ' + (detail || 'changes saved locally')
+    };
+    el.innerHTML = '<span class="sync-dot ' + status + '"></span><span></span>';
+    el.querySelector('span:last-child').textContent = labels[status] || labels.local;
+
+    const detailEl = document.getElementById('share-detail');
+    if (detailEl && shareConfig) {
+      if (status === 'syncing') detailEl.textContent = 'Syncing with GitHub…';
+      else if (status === 'synced') detailEl.textContent = 'Connected. ' + (detail ? detail.charAt(0).toUpperCase() + detail.slice(1) : 'Last sync just now') + '.';
+      else if (status === 'error') detailEl.textContent = 'Connection error: ' + (detail || 'check token/network. Will retry.');
+    }
+  }
+
+  function buildShareLink(gistId) {
+    const url = new URL(window.location.href);
+    url.hash = 'gist=' + encodeURIComponent(gistId);
+    return url.toString();
+  }
+
+  function getGistFromURL() {
+    const hash = window.location.hash;
+    if (!hash) return null;
+    const m = hash.match(/gist=([^&]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  // ---- GitHub API calls ----
+  async function ghCreateGist(token, data) {
+    const res = await fetch(GH_API + '/gists', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'token ' + token,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        description: 'Summer 2026 Calendar — shared events data',
+        public: false,
+        files: {
+          [GIST_FILENAME]: { content: JSON.stringify(data, null, 2) }
+        }
+      })
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error('Create failed (' + res.status + '): ' + txt.slice(0, 120));
+    }
+    return res.json();
+  }
+
+  async function ghReadGist(gistId, token) {
+    const headers = {
+      'Authorization': 'token ' + token,
+      'Accept': 'application/vnd.github+json'
+    };
+    if (lastEtag) headers['If-None-Match'] = lastEtag;
+
+    const res = await fetch(GH_API + '/gists/' + gistId, { headers });
+
+    if (res.status === 304) return { unchanged: true };
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error('Read failed (' + res.status + '): ' + txt.slice(0, 120));
+    }
+    lastEtag = res.headers.get('ETag');
+    const body = await res.json();
+    const file = body.files && body.files[GIST_FILENAME];
+    if (!file) throw new Error('Gist missing ' + GIST_FILENAME);
+    let content;
+    try {
+      content = JSON.parse(file.content);
+    } catch (e) {
+      throw new Error('Gist content is not valid JSON');
+    }
+    return { unchanged: false, data: content, htmlUrl: body.html_url };
+  }
+
+  async function ghUpdateGist(gistId, token, data) {
+    const res = await fetch(GH_API + '/gists/' + gistId, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': 'token ' + token,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        files: {
+          [GIST_FILENAME]: { content: JSON.stringify(data, null, 2) }
+        }
+      })
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error('Update failed (' + res.status + '): ' + txt.slice(0, 120));
+    }
+    // ETag changes after PATCH; reset so next pull re-reads
+    lastEtag = res.headers.get('ETag');
+    return res.json();
+  }
+
+  // ---- Push / Pull cycle ----
+  function schedulePush() {
+    if (!shareConfig || suppressPush) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushNow, PUSH_DEBOUNCE_MS);
+  }
+
+  async function pushNow() {
+    if (!shareConfig) return;
+    setSyncStatus('syncing');
+    try {
+      lastVersion++;
+      const payload = {
+        version: lastVersion,
+        updatedAt: new Date().toISOString(),
+        state: state
+      };
+      await ghUpdateGist(shareConfig.gistId, shareConfig.token, payload);
+      setSyncStatus('synced', 'just now');
+    } catch (err) {
+      console.warn('Push error:', err);
+      setSyncStatus('error', err.message);
+    }
+  }
+
+  async function pullNow() {
+    if (!shareConfig) return;
+    try {
+      const result = await ghReadGist(shareConfig.gistId, shareConfig.token);
+      if (result.unchanged) return;
+      const remote = result.data;
+      if (!remote || typeof remote !== 'object') return;
+      const remoteVersion = remote.version || 0;
+      if (remoteVersion > lastVersion && remote.state) {
+        suppressPush = true;
+        state = remote.state;
+        lastVersion = remoteVersion;
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){}
+        render();
+        suppressPush = false;
+        setSyncStatus('synced', 'updated from cloud');
+      }
+    } catch (err) {
+      console.warn('Pull error:', err);
+      setSyncStatus('error', err.message);
+    }
+  }
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(pullNow, POLL_MS);
+  }
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  // ---- Bootstrap on load ----
+  async function initSharing() {
+    const urlGist = getGistFromURL();
+
+    // If a Gist is in the URL but we don't have config, we'll handle it in openShareModal flow.
+    // But if we already have config that matches, just connect.
+    if (shareConfig) {
+      // If URL has a different gist, prefer the URL one and prompt.
+      if (urlGist && urlGist !== shareConfig.gistId) {
+        const proceed = confirm('This link points to a different shared calendar than the one you\'re currently connected to. Switch to it?');
+        if (proceed) {
+          saveShareConfig(null);
+          shareConfig = null;
+          lastEtag = null;
+          lastVersion = 0;
+        }
+      }
+    }
+
+    if (shareConfig) {
+      setSyncStatus('syncing');
+      try {
+        const result = await ghReadGist(shareConfig.gistId, shareConfig.token);
+        if (!result.unchanged && result.data && result.data.state) {
+          state = result.data.state;
+          lastVersion = result.data.version || 0;
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){}
+          render();
+        }
+        setSyncStatus('synced', 'loaded from cloud');
+        startPolling();
+      } catch (err) {
+        console.warn('Initial sync failed:', err);
+        setSyncStatus('error', err.message + ' — using local copy');
+      }
+    } else if (urlGist) {
+      // First-time visitor on a shared link — prompt to set up
+      setSyncStatus('local');
+      // Auto-open share modal so they can paste their token to join
+      setTimeout(() => {
+        openShareModal();
+      }, 300);
+    } else {
+      setSyncStatus('local');
+    }
+  }
+
+  // ---- Share modal handlers ----
+  function openShareModal() {
+    refreshShareModalView();
+    document.getElementById('share-modal').classList.add('open');
+  }
+  function closeShareModal() {
+    document.getElementById('share-modal').classList.remove('open');
+  }
+
+  function refreshShareModalView() {
+    const setup = document.getElementById('share-setup');
+    const connected = document.getElementById('share-connected');
+    const statusLine = document.getElementById('share-status-line');
+    const joinField = document.getElementById('join-existing-field');
+    const connectBtn = document.getElementById('connect-btn');
+
+    if (shareConfig) {
+      setup.style.display = 'none';
+      connected.style.display = 'block';
+      statusLine.textContent = 'Sharing is active';
+      const link = buildShareLink(shareConfig.gistId);
+      document.getElementById('share-link').value = link;
+      const gistLink = document.getElementById('gist-link');
+      if (gistLink) gistLink.href = 'https://gist.github.com/' + shareConfig.gistId;
+    } else {
+      setup.style.display = 'block';
+      connected.style.display = 'none';
+      document.getElementById('gh-token').value = '';
+      const urlGist = getGistFromURL();
+      if (urlGist) {
+        statusLine.textContent = 'Joining a shared calendar';
+        joinField.style.display = 'block';
+        document.getElementById('gh-gist-id').value = urlGist;
+        connectBtn.textContent = 'Join Shared Calendar';
+      } else {
+        statusLine.textContent = 'Currently saving locally';
+        joinField.style.display = 'none';
+        connectBtn.textContent = 'Connect & Create Link';
+      }
+    }
+  }
+
+  async function connectAndShare() {
+    const token = document.getElementById('gh-token').value.trim();
+    if (!token) { alert('Please paste your GitHub token.'); return; }
+    if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) {
+      if (!confirm('That doesn\'t look like a typical GitHub token (usually starts with "ghp_" or "github_pat_"). Continue anyway?')) return;
+    }
+
+    const btn = document.getElementById('connect-btn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Connecting…';
+    btn.disabled = true;
+
+    try {
+      const urlGist = getGistFromURL();
+      let gistId;
+
+      if (urlGist) {
+        // Joining an existing shared calendar — verify access and pull
+        const result = await ghReadGist(urlGist, token);
+        if (result.data && result.data.state) {
+          state = result.data.state;
+          lastVersion = result.data.version || 0;
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){}
+          render();
+        }
+        gistId = urlGist;
+      } else {
+        // Creating a new shared calendar
+        const initial = {
+          version: 1,
+          updatedAt: new Date().toISOString(),
+          state: state
+        };
+        const created = await ghCreateGist(token, initial);
+        gistId = created.id;
+        lastVersion = 1;
+      }
+
+      shareConfig = { gistId, token };
+      saveShareConfig(shareConfig);
+      window.history.replaceState(null, '', '#gist=' + encodeURIComponent(gistId));
+      refreshShareModalView();
+      setSyncStatus('synced', 'just now');
+      startPolling();
+    } catch (err) {
+      let msg = err.message;
+      if (msg.includes('401')) msg = 'Token rejected by GitHub. Make sure it has the "gist" scope and isn\'t expired.';
+      else if (msg.includes('404')) msg = 'Gist not found, or your token doesn\'t have access to it.';
+      alert('Could not connect: ' + msg);
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+  }
+
+  function copyShareLink() {
+    const inp = document.getElementById('share-link');
+    inp.select();
+    inp.setSelectionRange(0, 99999);
+    let copied = false;
+    try { copied = document.execCommand('copy'); } catch (e) {}
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(inp.value).then(showCopyFeedback).catch(() => { if (copied) showCopyFeedback(); });
+    } else if (copied) {
+      showCopyFeedback();
+    }
+  }
+  function showCopyFeedback() {
+    const fb = document.getElementById('copy-feedback');
+    fb.classList.add('show');
+    setTimeout(() => fb.classList.remove('show'), 1800);
+  }
+
+  function disconnectShare() {
+    if (!confirm('Stop sharing this calendar? Your local copy stays intact and the Gist remains on GitHub, but this device will no longer push changes.')) return;
+    stopPolling();
+    saveShareConfig(null);
+    lastEtag = null;
+    lastVersion = 0;
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    setSyncStatus('local');
+    refreshShareModalView();
+  }
+
+  // ============================================================
+
   render();
+  initSharing();
 </script>
 
 </body>
